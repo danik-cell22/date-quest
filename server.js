@@ -6,15 +6,36 @@ dotenv.config();
 
 const app = express();
 
-const PORT = 3001;
+/*
+========================================================
+PORT
+========================================================
+*/
+
+const PORT = process.env.PORT || 3001;
+
+
+/*
+========================================================
+TELEGRAM
+========================================================
+*/
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 
+/*
+========================================================
+MIDDLEWARE
+========================================================
+*/
+
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: "*",
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type"],
   })
 );
 
@@ -23,71 +44,65 @@ app.use(express.json());
 
 /*
 ========================================================
-ПРОВЕРКА НАСТРОЕК
+ПРОВЕРКА TELEGRAM
 ========================================================
 */
 
 if (!BOT_TOKEN) {
-  console.error(
-    "❌ Не найден TELEGRAM_BOT_TOKEN в .env"
-  );
+  console.error("❌ TELEGRAM_BOT_TOKEN не найден");
+} else {
+  console.log("✅ TELEGRAM_BOT_TOKEN найден");
 }
 
 if (!CHAT_ID) {
-  console.error(
-    "❌ Не найден TELEGRAM_CHAT_ID в .env"
-  );
+  console.error("❌ TELEGRAM_CHAT_ID не найден");
+} else {
+  console.log("✅ TELEGRAM_CHAT_ID найден");
 }
 
 
 /*
 ========================================================
-ОТПРАВКА В TELEGRAM
+ОТПРАВКА СООБЩЕНИЯ В TELEGRAM
 ========================================================
 */
 
 async function sendTelegramMessage(text) {
-
-  if (!BOT_TOKEN || !CHAT_ID) {
-    throw new Error(
-      "Telegram BOT_TOKEN или CHAT_ID не настроены"
-    );
+  if (!BOT_TOKEN) {
+    throw new Error("TELEGRAM_BOT_TOKEN не настроен");
   }
 
+  if (!CHAT_ID) {
+    throw new Error("TELEGRAM_CHAT_ID не настроен");
+  }
 
-  const response = await fetch(
-    `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-    {
-      method: "POST",
+  const url =
+    `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
 
-      headers: {
-        "Content-Type": "application/json",
-      },
+  const response = await fetch(url, {
+    method: "POST",
 
-      body: JSON.stringify({
-        chat_id: CHAT_ID,
-        text,
-      }),
-    }
-  );
+    headers: {
+      "Content-Type": "application/json",
+    },
 
+    body: JSON.stringify({
+      chat_id: CHAT_ID,
+      text: text,
+    }),
+  });
 
   const data = await response.json();
 
-
   if (!response.ok || !data.ok) {
-
-    console.error(
-      "Telegram error:",
-      data
-    );
+    console.error("❌ Telegram API error:", data);
 
     throw new Error(
-      data.description ||
-      "Telegram API error"
+      data.description || "Ошибка Telegram API"
     );
   }
 
+  console.log("✅ Сообщение отправлено в Telegram");
 
   return data;
 }
@@ -95,30 +110,40 @@ async function sendTelegramMessage(text) {
 
 /*
 ========================================================
-ПРОВЕРКА СЕРВЕРА
+ГЛАВНАЯ
 ========================================================
 */
 
 app.get("/", (req, res) => {
-
   res.json({
-    status: "ok",
+    ok: true,
     message: "Date Quest Telegram server is running ❤️",
   });
-
 });
 
 
 /*
 ========================================================
-ОТПРАВКА СОБЫТИЯ
+HEALTH CHECK
+========================================================
+*/
+
+app.get("/healthz", (req, res) => {
+  res.json({
+    ok: true,
+    status: "healthy",
+  });
+});
+
+
+/*
+========================================================
+TELEGRAM API
 ========================================================
 */
 
 app.post("/api/telegram", async (req, res) => {
-
   try {
-
     const {
       type,
       emotion,
@@ -128,14 +153,23 @@ app.post("/api/telegram", async (req, res) => {
       time,
     } = req.body;
 
+    console.log("📩 Получено событие:", {
+      type,
+      emotion,
+      answer,
+      choice,
+      date,
+      time,
+    });
+
 
     let message = "";
 
 
     /*
-    ================================================
-    НАЧАЛО
-    ================================================
+    ====================================================
+    EMOTION
+    ====================================================
     */
 
     if (type === "emotion") {
@@ -153,9 +187,9 @@ ${emotion || "Она ничего не написала."}`;
 
 
     /*
-    ================================================
-    ОТВЕТ ГАЗ / -
-    ================================================
+    ====================================================
+    ANSWER
+    ====================================================
     */
 
     else if (type === "answer") {
@@ -182,9 +216,9 @@ ${emotion || "Она ничего не написала."}`;
 
 
     /*
-    ================================================
-    ВЫБОР АТМОСФЕРЫ
-    ================================================
+    ====================================================
+    CHOICE
+    ====================================================
     */
 
     else if (type === "choice") {
@@ -192,7 +226,7 @@ ${emotion || "Она ничего не написала."}`;
       message =
 `✨ ВЫБРАНА АТМОСФЕРА
 
-${choice}
+${choice || "Не указана"}
 
 Теперь можно двигаться дальше ❤️`;
 
@@ -200,9 +234,9 @@ ${choice}
 
 
     /*
-    ================================================
-    ДАТА И ВРЕМЯ
-    ================================================
+    ====================================================
+    FINAL
+    ====================================================
     */
 
     else if (type === "final") {
@@ -248,9 +282,9 @@ ${time || "Не выбрано"}
 
 
     /*
-    ================================================
-    НЕИЗВЕСТНОЕ СОБЫТИЕ
-    ================================================
+    ====================================================
+    UNKNOWN
+    ====================================================
     */
 
     else {
@@ -264,60 +298,80 @@ ${time || "Не выбрано"}
 
 
     /*
-    ================================================
-    ОТПРАВЛЯЕМ
-    ================================================
+    ====================================================
+    SEND TELEGRAM
+    ====================================================
     */
 
     await sendTelegramMessage(message);
 
 
-    res.json({
-      ok: true,
-    });
+    /*
+    ====================================================
+    RESPONSE
+    ====================================================
+    */
 
+    return res.json({
+      ok: true,
+      message: "Сообщение отправлено в Telegram ❤️",
+    });
 
   } catch (error) {
 
-    console.error(
-      "Ошибка отправки:",
-      error
-    );
+    console.error("❌ Ошибка:", error);
 
-
-    res.status(500).json({
+    return res.status(500).json({
       ok: false,
-
-      error:
-        "Не удалось отправить сообщение в Telegram",
+      error: "Не удалось отправить сообщение в Telegram",
     });
 
   }
-
 });
 
 
 /*
 ========================================================
-ЗАПУСК
+404
 ========================================================
 */
 
-app.listen(PORT, () => {
+app.use((req, res) => {
+  res.status(404).json({
+    ok: false,
+    error: "Маршрут не найден",
+  });
+});
+
+
+/*
+========================================================
+START SERVER
+========================================================
+*/
+
+app.listen(PORT, "0.0.0.0", () => {
 
   console.log("");
+  console.log("💌 ===============================");
+  console.log("💌 DATE QUEST TELEGRAM SERVER");
+  console.log("💌 ===============================");
+
+  console.log(`🚀 Port: ${PORT}`);
+
   console.log(
-    "💌 Date Quest Telegram server"
+    `🌍 Server: http://0.0.0.0:${PORT}`
   );
 
   console.log(
-    `🚀 Server: http://localhost:${PORT}`
+    `📱 Telegram: ${BOT_TOKEN ? "ON" : "OFF"}`
   );
 
   console.log(
-    "📱 Telegram notifications: ON"
+    `💬 Chat ID: ${CHAT_ID ? "ON" : "OFF"}`
   );
 
   console.log("");
-
+  console.log("❤️ Server is ready!");
+  console.log("");
 });
