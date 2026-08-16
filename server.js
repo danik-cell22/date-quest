@@ -44,21 +44,38 @@ app.use(express.json());
 
 /*
 ========================================================
-ПРОВЕРКА TELEGRAM
+STARTUP CHECK
 ========================================================
 */
 
-if (!BOT_TOKEN) {
-  console.error("❌ TELEGRAM_BOT_TOKEN не найден");
-} else {
+console.log("");
+console.log("💌 ===============================");
+console.log("💌 DATE QUEST TELEGRAM SERVER");
+console.log("💌 ===============================");
+
+console.log(`🚀 PORT: ${PORT}`);
+
+if (BOT_TOKEN) {
   console.log("✅ TELEGRAM_BOT_TOKEN найден");
+} else {
+  console.error("❌ TELEGRAM_BOT_TOKEN НЕ найден");
 }
 
-if (!CHAT_ID) {
-  console.error("❌ TELEGRAM_CHAT_ID не найден");
-} else {
+if (CHAT_ID) {
   console.log("✅ TELEGRAM_CHAT_ID найден");
+} else {
+  console.error("❌ TELEGRAM_CHAT_ID НЕ найден");
 }
+
+console.log(
+  `📱 Telegram: ${BOT_TOKEN ? "ON" : "OFF"}`
+);
+
+console.log(
+  `💬 Chat ID: ${CHAT_ID ? "ON" : "OFF"}`
+);
+
+console.log("");
 
 
 /*
@@ -68,18 +85,26 @@ if (!CHAT_ID) {
 */
 
 async function sendTelegramMessage(text) {
+
   if (!BOT_TOKEN) {
-    throw new Error("TELEGRAM_BOT_TOKEN не настроен");
+    throw new Error(
+      "TELEGRAM_BOT_TOKEN не настроен"
+    );
   }
 
   if (!CHAT_ID) {
-    throw new Error("TELEGRAM_CHAT_ID не настроен");
+    throw new Error(
+      "TELEGRAM_CHAT_ID не настроен"
+    );
   }
+
 
   const url =
     `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
 
+
   const response = await fetch(url, {
+
     method: "POST",
 
     headers: {
@@ -90,19 +115,32 @@ async function sendTelegramMessage(text) {
       chat_id: CHAT_ID,
       text: text,
     }),
+
   });
+
 
   const data = await response.json();
 
+
   if (!response.ok || !data.ok) {
-    console.error("❌ Telegram API error:", data);
+
+    console.error(
+      "❌ Telegram API error:",
+      data
+    );
 
     throw new Error(
-      data.description || "Ошибка Telegram API"
+      data.description ||
+      "Ошибка Telegram API"
     );
+
   }
 
-  console.log("✅ Сообщение отправлено в Telegram");
+
+  console.log(
+    "✅ Сообщение успешно отправлено в Telegram"
+  );
+
 
   return data;
 }
@@ -115,10 +153,21 @@ async function sendTelegramMessage(text) {
 */
 
 app.get("/", (req, res) => {
+
   res.json({
+
     ok: true,
-    message: "Date Quest Telegram server is running ❤️",
+
+    message:
+      "Date Quest Telegram server is running ❤️",
+
+    telegram:
+      BOT_TOKEN && CHAT_ID
+        ? "configured"
+        : "not configured",
+
   });
+
 });
 
 
@@ -129,21 +178,53 @@ HEALTH CHECK
 */
 
 app.get("/healthz", (req, res) => {
-  res.json({
+
+  res.status(200).json({
+
     ok: true,
+
     status: "healthy",
+
   });
+
 });
 
 
 /*
 ========================================================
-TELEGRAM API
+TELEGRAM STATUS
+========================================================
+*/
+
+app.get("/api/telegram", (req, res) => {
+
+  res.json({
+
+    ok: true,
+
+    telegram: BOT_TOKEN
+      ? "configured"
+      : "missing",
+
+    chatId: CHAT_ID
+      ? "configured"
+      : "missing",
+
+  });
+
+});
+
+
+/*
+========================================================
+ОТПРАВКА В TELEGRAM
 ========================================================
 */
 
 app.post("/api/telegram", async (req, res) => {
+
   try {
+
     const {
       type,
       emotion,
@@ -153,7 +234,13 @@ app.post("/api/telegram", async (req, res) => {
       time,
     } = req.body;
 
-    console.log("📩 Получено событие:", {
+
+    console.log("");
+    console.log("📩 ===============================");
+    console.log("📩 НОВОЕ СОБЫТИЕ");
+    console.log("📩 ===============================");
+
+    console.log({
       type,
       emotion,
       answer,
@@ -283,15 +370,25 @@ ${time || "Не выбрано"}
 
     /*
     ====================================================
-    UNKNOWN
+    UNKNOWN TYPE
     ====================================================
     */
 
     else {
 
+      console.error(
+        "❌ Неизвестный тип события:",
+        type
+      );
+
+
       return res.status(400).json({
+
         ok: false,
-        error: "Неизвестный тип события",
+
+        error:
+          "Неизвестный тип события",
+
       });
 
     }
@@ -299,7 +396,7 @@ ${time || "Не выбрано"}
 
     /*
     ====================================================
-    SEND TELEGRAM
+    SEND
     ====================================================
     */
 
@@ -308,25 +405,48 @@ ${time || "Не выбрано"}
 
     /*
     ====================================================
-    RESPONSE
+    SUCCESS
     ====================================================
     */
 
-    return res.json({
+    return res.status(200).json({
+
       ok: true,
-      message: "Сообщение отправлено в Telegram ❤️",
-    });
 
-  } catch (error) {
+      message:
+        "Сообщение отправлено в Telegram ❤️",
 
-    console.error("❌ Ошибка:", error);
-
-    return res.status(500).json({
-      ok: false,
-      error: "Не удалось отправить сообщение в Telegram",
     });
 
   }
+
+
+  /*
+  ======================================================
+  ERROR
+  ======================================================
+  */
+
+  catch (error) {
+
+    console.error(
+      "❌ Ошибка отправки:",
+      error
+    );
+
+
+    return res.status(500).json({
+
+      ok: false,
+
+      error:
+        error.message ||
+        "Не удалось отправить сообщение в Telegram",
+
+    });
+
+  }
+
 });
 
 
@@ -337,10 +457,17 @@ ${time || "Не выбрано"}
 */
 
 app.use((req, res) => {
+
   res.status(404).json({
+
     ok: false,
+
     error: "Маршрут не найден",
+
+    path: req.path,
+
   });
+
 });
 
 
@@ -350,28 +477,21 @@ START SERVER
 ========================================================
 */
 
-app.listen(PORT, "0.0.0.0", () => {
+app.listen(
+  PORT,
+  "0.0.0.0",
+  () => {
 
-  console.log("");
-  console.log("💌 ===============================");
-  console.log("💌 DATE QUEST TELEGRAM SERVER");
-  console.log("💌 ===============================");
+    console.log("");
+    console.log(
+      `🚀 Server started on port ${PORT}`
+    );
 
-  console.log(`🚀 Port: ${PORT}`);
+    console.log(
+      "❤️ Date Quest server is ready!"
+    );
 
-  console.log(
-    `🌍 Server: http://0.0.0.0:${PORT}`
-  );
+    console.log("");
 
-  console.log(
-    `📱 Telegram: ${BOT_TOKEN ? "ON" : "OFF"}`
-  );
-
-  console.log(
-    `💬 Chat ID: ${CHAT_ID ? "ON" : "OFF"}`
-  );
-
-  console.log("");
-  console.log("❤️ Server is ready!");
-  console.log("");
-});
+  }
+);
