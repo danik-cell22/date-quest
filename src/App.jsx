@@ -373,7 +373,7 @@ function App() {
         {step === 0 && (
           <>
             <div style={smallLabelStyle}>
-              only for you
+              only for Lizzy
             </div>
 
             <div
@@ -772,6 +772,7 @@ function App() {
             </div>
           </>
         )}
+
       </div>
     </div>
   );
