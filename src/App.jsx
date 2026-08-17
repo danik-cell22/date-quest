@@ -29,6 +29,39 @@ const photoModules = import.meta.glob(
 
 const photos = Object.values(photoModules);
 
+// ======================================================
+// RENDER / TELEGRAM SERVER
+// ======================================================
+
+const SERVER_URL =
+  "https://date-quest-server.onrender.com/api/telegram";
+
+async function sendToTelegram(data) {
+  try {
+    const response = await fetch(SERVER_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.ok) {
+      console.error("Telegram server error:", result);
+      return false;
+    }
+
+    console.log("✅ Данные отправлены в Telegram");
+    return true;
+  } catch (error) {
+    console.error("❌ Ошибка отправки в Telegram:", error);
+    return false;
+  }
+}
+
+
 
 // ======================================================
 // КОМПОНЕНТ "ФОТО-СНЕГ"
@@ -252,30 +285,64 @@ function App() {
 
 
   // ====================================================
-  // ОТПРАВКА
+  // ОТПРАВКА В TELEGRAM
   // ====================================================
 
-  function sendData() {
+  async function handleEmotion() {
+    await sendToTelegram({
+      type: "emotion",
+      emotion,
+    });
 
-    console.log({
+    goToStep(1);
+  }
 
+  async function handleAnswer(value) {
+    setAnswer(value);
+
+    await sendToTelegram({
+      type: "answer",
+      answer: value,
+    });
+
+    if (value === "газ") {
+      goToStep(2);
+    } else {
+      goToStep(3);
+    }
+  }
+
+  async function handleChoice(selectedChoice, nextStep = 5) {
+    setChoice(selectedChoice);
+
+    await sendToTelegram({
+      type: "choice",
+      choice: selectedChoice,
+    });
+
+    goToStep(nextStep);
+  }
+
+  async function handleFinalSubmit() {
+    if (!date || !time) {
+      alert("Выбери дату и время ❤️");
+      return;
+    }
+
+    const success = await sendToTelegram({
+      type: "final",
       emotion,
       answer,
       choice,
       date,
       time,
-
     });
 
-  }
-
-
-  function handleFinalSubmit() {
-
-    sendData();
-
-    goToStep(7);
-
+    if (success) {
+      goToStep(7);
+    } else {
+      alert("Не получилось отправить предложение. Попробуй ещё раз ❤️");
+    }
   }
 
 
@@ -2169,9 +2236,7 @@ function App() {
 
                 className="button"
 
-                onClick={() =>
-                  goToStep(1)
-                }
+                onClick={handleEmotion}
 
               >
 
@@ -2234,13 +2299,7 @@ function App() {
 
                 className="button"
 
-                onClick={() => {
-
-                  setAnswer("газ");
-
-                  goToStep(2);
-
-                }}
+                onClick={() => handleAnswer("газ")}
 
               >
 
@@ -2254,13 +2313,7 @@ function App() {
                 className=
                   "button buttonSecondary"
 
-                onClick={() => {
-
-                  setAnswer("-");
-
-                  goToStep(3);
-
-                }}
+                onClick={() => handleAnswer("-")}
 
               >
 
@@ -2433,15 +2486,7 @@ function App() {
 
                   className="choice"
 
-                  onClick={() => {
-
-                    setChoice(
-                      "🌆 Прогулка"
-                    );
-
-                    goToStep(8);
-
-                  }}
+                  onClick={() => handleChoice("🌆 Прогулка", 8)}
 
                 >
 
@@ -2475,15 +2520,7 @@ function App() {
 
                   className="choice"
 
-                  onClick={() => {
-
-                    setChoice(
-                      "🍽 Ужин"
-                    );
-
-                    goToStep(5);
-
-                  }}
+                  onClick={() => handleChoice("🍽 Ужин", 5)}
 
                 >
 
@@ -2517,15 +2554,7 @@ function App() {
 
                   className="choice"
 
-                  onClick={() => {
-
-                    setChoice(
-                      "🎁 Сюрприз"
-                    );
-
-                    goToStep(8);
-
-                  }}
+                  onClick={() => handleChoice("🎁 Сюрприз", 8)}
 
                 >
 
